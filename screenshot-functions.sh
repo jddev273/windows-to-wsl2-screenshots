@@ -8,7 +8,7 @@ start-screenshot-monitor() {
     echo "🚀 Starting Windows-to-WSL2 screenshot automation..."
     
     # Kill any existing monitors
-    pkill -f "auto-clipboard-monitor" 2>/dev/null || true
+    pkill -f "auto-clipboard-monitor.ps1" 2>/dev/null || true
     
     # Create screenshots directory in home
     mkdir -p "$HOME/.screenshots"
@@ -42,20 +42,35 @@ start-screenshot-monitor() {
 # Stop the monitor
 stop-screenshot-monitor() {
     echo "🛑 Stopping screenshot automation..."
-    pkill -f "auto-clipboard-monitor" 2>/dev/null || true
+    pkill -f "auto-clipboard-monitor.ps1" 2>/dev/null || true
     echo "✅ Screenshot automation stopped"
 }
 
 # Check if running
 check-screenshot-monitor() {
-    if pgrep -f "auto-clipboard-monitor" > /dev/null 2>&1; then
+    # Check for the PowerShell process running our script
+    if pgrep -f "auto-clipboard-monitor.ps1" > /dev/null 2>&1; then
         echo "✅ Screenshot automation is running"
         echo "🔥 Just take screenshots - everything is automatic!"
         echo "📁 Saves to: $HOME/.screenshots/"
         echo "📋 Paths automatically copied to clipboard for easy pasting!"
+        
+        # Show recent log entries if available
+        if [ -f "$HOME/.screenshots/monitor.log" ]; then
+            echo ""
+            echo "📝 Recent activity (last 5 lines from log):"
+            tail -n 5 "$HOME/.screenshots/monitor.log" 2>/dev/null || echo "   (log file empty or unreadable)"
+        fi
     else
         echo "❌ Screenshot automation not running"
         echo "💡 Start with: start-screenshot-monitor"
+        
+        # Check if log file exists and show last few lines for troubleshooting
+        if [ -f "$HOME/.screenshots/monitor.log" ]; then
+            echo ""
+            echo "📝 Last log entries (for troubleshooting):"
+            tail -n 10 "$HOME/.screenshots/monitor.log" 2>/dev/null || echo "   (log file empty or unreadable)"
+        fi
     fi
 }
 
@@ -135,6 +150,80 @@ clean-screenshots() {
     fi
 }
 
+# Troubleshooting function to help diagnose issues
+troubleshoot-screenshots() {
+    echo "🔧 Screenshot Automation Troubleshooting"
+    echo ""
+    
+    # Check if PowerShell is available
+    if command -v powershell.exe > /dev/null; then
+        echo "✅ PowerShell is available"
+    else
+        echo "❌ PowerShell not found - this tool requires Windows with WSL2"
+        return 1
+    fi
+    
+    # Check if clip.exe is available
+    if command -v clip.exe > /dev/null; then
+        echo "✅ clip.exe is available for clipboard operations"
+    else
+        echo "⚠️  clip.exe not found - clipboard sync may not work"
+    fi
+    
+    # Check if screenshots directory exists
+    if [ -d "$HOME/.screenshots" ]; then
+        echo "✅ Screenshots directory exists: $HOME/.screenshots"
+        local count=$(ls -1 "$HOME/.screenshots"/*.png 2>/dev/null | wc -l)
+        echo "   📁 Contains $count PNG files"
+    else
+        echo "⚠️  Screenshots directory doesn't exist yet: $HOME/.screenshots"
+    fi
+    
+    # Check if PowerShell script exists
+    local script_dir="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+    local ps_script="$script_dir/auto-clipboard-monitor.ps1"
+    if [ -f "$ps_script" ]; then
+        echo "✅ PowerShell script found: $ps_script"
+    else
+        echo "❌ PowerShell script not found: $ps_script"
+    fi
+    
+    # Check if monitor is running
+    if pgrep -f "auto-clipboard-monitor.ps1" > /dev/null 2>&1; then
+        echo "✅ Screenshot monitor is currently running"
+    else
+        echo "⚠️  Screenshot monitor is not running"
+    fi
+    
+    # Check log file
+    if [ -f "$HOME/.screenshots/monitor.log" ]; then
+        echo "✅ Log file exists: $HOME/.screenshots/monitor.log"
+        local log_size=$(stat -c%s "$HOME/.screenshots/monitor.log" 2>/dev/null || echo "0")
+        echo "   📝 Log file size: $log_size bytes"
+        if [ "$log_size" -gt 0 ]; then
+            echo ""
+            echo "📝 Last 10 lines from log:"
+            tail -n 10 "$HOME/.screenshots/monitor.log"
+        else
+            echo "   (log file is empty)"
+        fi
+    else
+        echo "⚠️  No log file found - monitor may not have been started yet"
+    fi
+    
+    echo ""
+    echo "💡 Common issues and solutions:"
+    echo "   • If monitor won't start: Check that you're running from the correct directory"
+    echo "   • If screenshots aren't detected: Try using Windows Terminal instead of basic WSL terminal"
+    echo "   • If clipboard doesn't work: Make sure clip.exe is available in your WSL environment"
+    echo "   • Check the log file for detailed error messages"
+}
+
+# Alias for backward compatibility
+check-screenshot-status() {
+    check-screenshot-monitor
+}
+
 # Show help
 screenshot-help() {
     echo "🚀 Windows-to-WSL2 Screenshot Automation"
@@ -143,12 +232,14 @@ screenshot-help() {
     echo "  start-screenshot-monitor    - Start the automation"
     echo "  stop-screenshot-monitor     - Stop the automation"
     echo "  check-screenshot-monitor    - Check if running"
+    echo "  check-screenshot-status     - Check if running (alias)"
     echo "  latest-screenshot           - Get path to latest screenshot"
     echo "  copy-latest-screenshot      - Copy latest screenshot path to clipboard"
     echo "  copy-screenshot <file>      - Copy specific screenshot path to clipboard"
     echo "  list-screenshots            - List all available screenshots"
     echo "  open-screenshots            - Open screenshots directory"
     echo "  clean-screenshots [count]   - Clean old screenshots (default: keep 10)"
+    echo "  troubleshoot-screenshots    - Run troubleshooting diagnostics"
     echo "  screenshot-help             - Show this help"
     echo ""
     echo "🔥 Quick start:"
@@ -165,3 +256,5 @@ alias copy-latest='copy-latest-screenshot'
 alias start-screenshots='start-screenshot-monitor'
 alias stop-screenshots='stop-screenshot-monitor'
 alias check-screenshots='check-screenshot-monitor'
+alias check-screenshot-status='check-screenshot-monitor'
+alias troubleshoot='troubleshoot-screenshots'

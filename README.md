@@ -37,7 +37,7 @@ check-screenshot-monitor
 start-screenshot-monitor
 
 # Check if running
-check-screenshot-status
+check-screenshot-monitor
 
 # Stop when done
 stop-screenshot-monitor
@@ -61,6 +61,9 @@ Now just take screenshots and paste paths directly into Claude Code, VS Code, or
 ```bash
 # Check the log
 cat ~/.screenshots/monitor.log
+
+# Or run full diagnostics
+troubleshoot-screenshots
 ```
 
 ## Notes
