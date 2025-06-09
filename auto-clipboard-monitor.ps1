@@ -11,20 +11,83 @@ Add-Type -AssemblyName System.Drawing
 if ($SaveDirectory -eq "~/.screenshots") {
     # Try to auto-detect WSL distribution if auto mode is used
     if ($WslDistro -eq "auto") {
-        $WslDistros = @(wsl.exe -l -q | Where-Object { 
+        # Get all WSL distributions excluding docker ones
+        $WslDistros = @(wsl.exe -l -q 2>$null | Where-Object { 
             $_ -and $_.Trim() -ne "" -and $_ -notlike "*docker*" 
         } | ForEach-Object { 
             $_.Trim() -replace '\s+', '' -replace '\x00', ''
         })
-        if ($WslDistros.Count -gt 0) {
-            $WslDistro = $WslDistros[0]
-            Write-Host "Auto-detected WSL distribution: $WslDistro"
+        
+        # Prefer Ubuntu-22.04 specifically
+        $UbuntuDistro = $WslDistros | Where-Object { $_ -eq "Ubuntu-22.04" } | Select-Object -First 1
+        
+        # If not found, try any Ubuntu distribution but NOT Ubuntu-18.04
+        if (-not $UbuntuDistro) {
+            $UbuntuDistro = $WslDistros | Where-Object { $_ -like "*Ubuntu*" -and $_ -ne "Ubuntu-18.04" } | Select-Object -First 1
         }
+        
+        if ($UbuntuDistro) {
+            $WslDistro = $UbuntuDistro
+        } elseif ($WslDistros.Count -gt 0) {
+            $WslDistro = $WslDistros[0]
+        } else {
+            # Hardcoded fallback
+            $WslDistro = "Ubuntu-22.04"
+            Write-Warning "Could not auto-detect WSL distribution, using fallback: $WslDistro"
+        }
+        
+        Write-Host "Using WSL distribution: $WslDistro"
     }
     
-    # Get the actual WSL username instead of Windows username
-    $WslUsername = wsl.exe -d $WslDistro -e whoami
-    $WslUsername = $WslUsername.Trim()
+    # Try multiple methods to get the WSL username
+    $WslUsername = $null
+    
+    # Method 1: Direct whoami
+    try {
+        $WslUsername = wsl.exe -d $WslDistro whoami 2>$null
+        if ($WslUsername) {
+            $WslUsername = $WslUsername.Trim()
+        }
+    } catch {}
+    
+    # Method 2: Using bash -c
+    if ([string]::IsNullOrWhiteSpace($WslUsername)) {
+        try {
+            $WslUsername = wsl.exe -d $WslDistro bash -c "whoami" 2>$null
+            if ($WslUsername) {
+                $WslUsername = $WslUsername.Trim()
+            }
+        } catch {}
+    }
+    
+    # Method 3: Using sh -c
+    if ([string]::IsNullOrWhiteSpace($WslUsername)) {
+        try {
+            $WslUsername = wsl.exe -d $WslDistro sh -c "whoami" 2>$null
+            if ($WslUsername) {
+                $WslUsername = $WslUsername.Trim()
+            }
+        } catch {}
+    }
+    
+    # Method 4: Extract from home directory path
+    if ([string]::IsNullOrWhiteSpace($WslUsername)) {
+        try {
+            $HomePath = wsl.exe -d $WslDistro sh -c "echo ~" 2>$null
+            if ($HomePath -match "/home/([^/]+)") {
+                $WslUsername = $Matches[1]
+            }
+        } catch {}
+    }
+    
+    # Method 5: Hardcoded fallback based on Windows username
+    if ([string]::IsNullOrWhiteSpace($WslUsername)) {
+        # Try to use Windows username in lowercase as a last resort
+        $WslUsername = $env:USERNAME.ToLower()
+        Write-Warning "Could not detect WSL username, using Windows username as fallback: $WslUsername"
+    }
+    
+    Write-Host "WSL Username: $WslUsername"
     $SaveDirectory = "\\wsl.localhost\$WslDistro\home\$WslUsername\.screenshots"
 }
 

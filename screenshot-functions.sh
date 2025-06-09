@@ -5,6 +5,8 @@
 
 # Start the auto-screenshot monitor
 start-screenshot-monitor() {
+    local wsl_distro="${1:-auto}"
+    
     echo "🚀 Starting Windows-to-WSL2 screenshot automation..."
     
     # Kill any existing monitors
@@ -23,8 +25,15 @@ start-screenshot-monitor() {
         return 1
     fi
     
+    # If WSL distro is specified, pass it to PowerShell
+    local ps_args=""
+    if [ "$wsl_distro" != "auto" ]; then
+        ps_args="-WslDistro \"$wsl_distro\""
+        echo "📦 Using specified WSL distribution: $wsl_distro"
+    fi
+    
     # Start the monitor in background
-    nohup powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File "$ps_script" > "$HOME/.screenshots/monitor.log" 2>&1 &
+    nohup powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File "$ps_script" $ps_args > "$HOME/.screenshots/monitor.log" 2>&1 &
     
     echo "✅ SCREENSHOT AUTOMATION IS NOW RUNNING!"
     echo ""
@@ -140,19 +149,20 @@ screenshot-help() {
     echo "🚀 Windows-to-WSL2 Screenshot Automation"
     echo ""
     echo "📋 Available commands:"
-    echo "  start-screenshot-monitor    - Start the automation"
-    echo "  stop-screenshot-monitor     - Stop the automation"
-    echo "  check-screenshot-monitor    - Check if running"
-    echo "  latest-screenshot           - Get path to latest screenshot"
-    echo "  copy-latest-screenshot      - Copy latest screenshot path to clipboard"
-    echo "  copy-screenshot <file>      - Copy specific screenshot path to clipboard"
-    echo "  list-screenshots            - List all available screenshots"
-    echo "  open-screenshots            - Open screenshots directory"
-    echo "  clean-screenshots [count]   - Clean old screenshots (default: keep 10)"
-    echo "  screenshot-help             - Show this help"
+    echo "  start-screenshot-monitor [distro] - Start the automation (optional: specify WSL distro)"
+    echo "  stop-screenshot-monitor           - Stop the automation"
+    echo "  check-screenshot-monitor          - Check if running"
+    echo "  latest-screenshot                 - Get path to latest screenshot"
+    echo "  copy-latest-screenshot            - Copy latest screenshot path to clipboard"
+    echo "  copy-screenshot <file>            - Copy specific screenshot path to clipboard"
+    echo "  list-screenshots                  - List all available screenshots"
+    echo "  open-screenshots                  - Open screenshots directory"
+    echo "  clean-screenshots [count]         - Clean old screenshots (default: keep 10)"
+    echo "  screenshot-help                   - Show this help"
     echo ""
     echo "🔥 Quick start:"
     echo "  1. Run: start-screenshot-monitor"
+    echo "     Or specify distro: start-screenshot-monitor Ubuntu-22.04"
     echo "  2. Take screenshots with Win+Shift+S"
     echo "  3. Paths are automatically copied to clipboard!"
     echo "  4. Just Ctrl+V in Claude Code!"
