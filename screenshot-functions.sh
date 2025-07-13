@@ -3,9 +3,39 @@
 # Windows-to-WSL2 Screenshot Automation Functions
 # Auto-saves screenshots from Windows clipboard to WSL2 and manages clipboard sync
 
-# Start the auto-screenshot monitor
+# Start the auto-screenshot monitor with optional ShareX support
 start-screenshot-monitor() {
-    echo "🚀 Starting Windows-to-WSL2 screenshot automation..."
+    local sharex_path=""
+    local watch_dirs=""
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --sharex-path)
+                sharex_path="$2"
+                shift 2
+                ;;
+            --watch-dir)
+                if [ -n "$watch_dirs" ]; then
+                    watch_dirs="$watch_dirs,$2"
+                else
+                    watch_dirs="$2"
+                fi
+                shift 2
+                ;;
+            --no-sharex)
+                sharex_path="none"
+                shift
+                ;;
+            *)
+                echo "Unknown option: $1"
+                echo "Usage: start-screenshot-monitor [--sharex-path PATH] [--watch-dir PATH] [--no-sharex]"
+                return 1
+                ;;
+        esac
+    done
+    
+    echo "🚀 Starting enhanced Windows-to-WSL2 screenshot automation..."
     
     # Kill any existing monitors
     pkill -f "auto-clipboard-monitor" 2>/dev/null || true
@@ -23,20 +53,42 @@ start-screenshot-monitor() {
         return 1
     fi
     
+    # Build PowerShell command with parameters
+    local ps_cmd="powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File \"$ps_script\""
+    
+    if [ -n "$sharex_path" ]; then
+        ps_cmd="$ps_cmd -ShareXPath \"$sharex_path\""
+    fi
+    
+    if [ -n "$watch_dirs" ]; then
+        ps_cmd="$ps_cmd -WatchDirectories @(\"${watch_dirs//,/\",\"}\")"
+    fi
+    
     # Start the monitor in background
-    nohup powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File "$ps_script" > "$HOME/.screenshots/monitor.log" 2>&1 &
+    nohup bash -c "$ps_cmd" > "$HOME/.screenshots/monitor.log" 2>&1 &
     
     echo "✅ SCREENSHOT AUTOMATION IS NOW RUNNING!"
     echo ""
-    echo "🔥 MAGIC WORKFLOW:"
-    echo "   1. Take screenshot (Win+Shift+S, Win+PrintScreen, etc.)"
-    echo "   2. Image automatically saved to $HOME/.screenshots/"
-    echo "   3. Path automatically copied to both Windows & WSL2 clipboards!"
+    echo "🔥 ENHANCED WORKFLOW:"
+    echo "   1. Take screenshots with:"
+    echo "      • Win+Shift+S (Windows Snipping Tool)"
+    echo "      • ShareX (auto-detected)"
+    echo "      • Any screenshot tool saving to monitored directories"
+    echo "   2. Images automatically saved to $HOME/.screenshots/"
+    echo "   3. Paths automatically copied to both Windows & WSL2 clipboards!"
     echo "   4. Just Ctrl+V in Claude Code or any application!"
     echo ""
     echo "📁 Images save to: $HOME/.screenshots/"
     echo "🔗 Latest always at: $HOME/.screenshots/latest.png"
     echo "📋 Drag & drop images to $HOME/.screenshots/ also works!"
+    
+    if [ -n "$sharex_path" ] && [ "$sharex_path" != "none" ]; then
+        echo "📸 ShareX path: $sharex_path"
+    fi
+    
+    if [ -n "$watch_dirs" ]; then
+        echo "👀 Additional watch dirs: $watch_dirs"
+    fi
 }
 
 # Stop the monitor
@@ -137,25 +189,37 @@ clean-screenshots() {
 
 # Show help
 screenshot-help() {
-    echo "🚀 Windows-to-WSL2 Screenshot Automation"
+    echo "🚀 Enhanced Windows-to-WSL2 Screenshot Automation"
     echo ""
     echo "📋 Available commands:"
-    echo "  start-screenshot-monitor    - Start the automation"
-    echo "  stop-screenshot-monitor     - Stop the automation"
-    echo "  check-screenshot-monitor    - Check if running"
-    echo "  latest-screenshot           - Get path to latest screenshot"
-    echo "  copy-latest-screenshot      - Copy latest screenshot path to clipboard"
-    echo "  copy-screenshot <file>      - Copy specific screenshot path to clipboard"
-    echo "  list-screenshots            - List all available screenshots"
-    echo "  open-screenshots            - Open screenshots directory"
-    echo "  clean-screenshots [count]   - Clean old screenshots (default: keep 10)"
-    echo "  screenshot-help             - Show this help"
+    echo "  start-screenshot-monitor [options]  - Start the automation"
+    echo "    Options:"
+    echo "      --sharex-path PATH    - Specify custom ShareX directory"
+    echo "      --watch-dir PATH      - Add additional directory to monitor"
+    echo "      --no-sharex          - Disable ShareX auto-detection"
+    echo "  stop-screenshot-monitor             - Stop the automation"
+    echo "  check-screenshot-monitor            - Check if running"
+    echo "  latest-screenshot                   - Get path to latest screenshot"
+    echo "  copy-latest-screenshot              - Copy latest screenshot path to clipboard"
+    echo "  copy-screenshot <file>              - Copy specific screenshot path to clipboard"
+    echo "  list-screenshots                    - List all available screenshots"
+    echo "  open-screenshots                    - Open screenshots directory"
+    echo "  clean-screenshots [count]           - Clean old screenshots (default: keep 10)"
+    echo "  screenshot-help                     - Show this help"
     echo ""
     echo "🔥 Quick start:"
     echo "  1. Run: start-screenshot-monitor"
-    echo "  2. Take screenshots with Win+Shift+S"
+    echo "  2. Take screenshots with:"
+    echo "     • Win+Shift+S (Windows Snipping Tool)"
+    echo "     • ShareX (auto-detected)"
+    echo "     • Any screenshot tool"
     echo "  3. Paths are automatically copied to clipboard!"
     echo "  4. Just Ctrl+V in Claude Code!"
+    echo ""
+    echo "📸 ShareX Integration:"
+    echo "  • Auto-detects common ShareX paths"
+    echo "  • Monitors ShareX screenshot directories"
+    echo "  • Works with your existing ShareX workflow"
 }
 
 # Aliases for convenience
