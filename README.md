@@ -4,22 +4,23 @@
 
 ⭐ Star this repo if it helps you!
 
-This tool was created to solve the annoying workflow of taking screenshots in Windows and getting them into Claude Code in WSL2. It automatically saves your screenshots and copies the file path to your clipboard so you can just Ctrl+V into Claude Code, VS Code, or any application that needs file paths.
+This tool watches the Windows clipboard for screenshots, saves them into your current WSL user's `~/.screenshots/` directory, and puts the WSL file path on the shared clipboard so it is ready to paste.
 
 ## What it does
 
-1. **Take screenshot** (Win+Shift+S, Win+PrintScreen, etc.)
-2. **Auto-saves** to `~/.screenshots/` in WSL2  
-3. **Auto-copies path** to clipboard
-4. **Paste into Claude Code, VS Code, or any app that uses WSL2** with Ctrl+V
+1. **Take a screenshot** with Win+Shift+S, Win+PrintScreen, or another Windows capture tool.
+2. **Auto-saves** the image to `~/.screenshots/` in the WSL distribution where you started the monitor.
+3. **Auto-copies the WSL path** to the Windows clipboard.
+4. **Paste the path** into Claude Code, VS Code, or another WSL-based workflow.
 
-Perfect for Claude Code workflows, VS Code documentation, or any development scenario where you need to quickly share screenshots.
+The launcher uses WSL's own `wslpath` conversion for the active `$HOME`. It does not hard-code an Ubuntu version, distribution name, or username.
 
 ## Requirements
 
 - Windows 10/11 with WSL2
-- Any WSL2 distribution (Ubuntu, Debian, etc.)
-- Works with **[Windows Terminal](https://apps.microsoft.com/detail/9n0dx20hk701)** (from Microsoft)
+- Windows PowerShell available through WSL interop as `powershell.exe`
+- `wslpath` (included with WSL)
+- A WSL2 distribution such as Ubuntu or Debian
 
 ## Installation
 
@@ -27,7 +28,6 @@ Perfect for Claude Code workflows, VS Code documentation, or any development sce
 gh repo clone jddev273/windows-to-wsl2-screenshots
 cd windows-to-wsl2-screenshots
 source screenshot-functions.sh
-check-screenshot-monitor
 ```
 
 ## Usage
@@ -36,42 +36,56 @@ check-screenshot-monitor
 # Start the automation
 start-screenshot-monitor
 
-# Check if running
+# Check if the tracked monitor is running
+check-screenshot-monitor
+
+# Compatibility name used by older documentation
 check-screenshot-status
 
-# Stop when done
+# Ask the Windows monitor to stop cleanly
 stop-screenshot-monitor
 ```
 
-Now just take screenshots and paste paths directly into Claude Code, VS Code, or any application thae uses WSL2!
+Once the monitor reports a successful start, take screenshots and paste the resulting WSL path wherever you need it.
+
+The launcher waits for a Windows-authored `~/.screenshots/monitor.ready` marker instead of treating the WSL interop relay alone as proof that PowerShell initialized. If the Windows monitor never becomes ready or exits during startup, the command returns an error and shows the end of `~/.screenshots/monitor.log`.
+
+Stopping uses a small control-file handshake: WSL writes `~/.screenshots/monitor.stop`, the PowerShell loop exits itself, and PowerShell removes the ready/stop markers. This avoids depending on Linux signals being forwarded through WSL to terminate a Windows process.
 
 ## 🎬 Demo
 
 ![Screenshot showing the tool in action](demo-screenshot.png)
 
-*The tool automatically detects screenshots, saves them, and copies the path to your clipboard - ready for instant pasting into Claude Code, VS Code, or any application that uses WSL2!*
+*The tool automatically detects screenshots, saves them, and copies the WSL path to the clipboard for quick pasting.*
 
 ## Troubleshooting
 
-**Clipboard not working?** 
-- Use **[Windows Terminal](https://apps.microsoft.com/detail/9n0dx20hk701)** instead of basic Ubuntu terminal
-- Basic WSL terminals have clipboard sync issues
+Run the built-in diagnostics first:
 
-**Monitor not starting?**
 ```bash
-# Check the log
+troubleshoot-screenshots
+```
+
+It checks whether `powershell.exe`, `wslpath`, and the PowerShell monitor script are available, shows the translated Windows path, reports both the tracked WSL relay and Windows readiness state, and prints recent log lines when a log exists.
+
+You can also inspect the log directly:
+
+```bash
 cat ~/.screenshots/monitor.log
 ```
 
+If `powershell.exe` is not found from WSL, confirm that Windows interoperability is enabled and that Windows executables are available on your WSL `PATH`.
+
+A stale `monitor.pid` is rejected using the Linux process start time rather than a broad process-name match. If `monitor.ready` exists while the tracked WSL relay is missing or stale, the commands fail conservatively instead of assuming the Windows process is gone; run `stop-screenshot-monitor` and inspect `monitor.log` if the stop handshake does not clear the state.
+
 ## Notes
 
-- Tested on one system so far (mine) - your results may vary
-- Created specifically for Claude Code workflows  
-- Works great with VS Code, documentation tools, any WSL2 application
-- **Uses PowerShell ExecutionPolicy Bypass** - required for the automation to work, only affects this specific script
-- **Polls for clipboard changes** was the simplest solution, you could bump up the time from 500ms if wanted.
-- **Developed with Claude Code** - if you need customizations or run into issues, try asking Claude Code to help modify the scripts!
-
+- The PowerShell monitor is launched with `-ExecutionPolicy Bypass` for this script only.
+- Clipboard polling defaults to 500 ms.
+- `~/.screenshots/monitor.pid` tracks the WSL interop relay PID plus Linux process start time so reused/stale Linux PIDs are not mistaken for the current launch.
+- `~/.screenshots/monitor.ready` is written by Windows PowerShell after initialization; `monitor.stop` is the WSL-to-Windows graceful shutdown request.
+- The PowerShell side receives both the Windows-accessible save directory and the native WSL path explicitly; it does not try to guess the active distribution or WSL username.
+- Developed with Claude Code; contributions and compatibility reports are welcome.
 
 ---
 
